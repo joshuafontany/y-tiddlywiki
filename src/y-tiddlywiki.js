@@ -431,6 +431,7 @@ export class TiddlywikiBinding {
 		} catch (error) {
 			return callback(error)
 		}
+		return callback(null)
 	}
 	load (title,callback) {
 		let fields = null
@@ -449,6 +450,7 @@ export class TiddlywikiBinding {
 		} catch (error) {
 			return callback(error)
 		}
+		return callback(null)
 	}
 	destroy () {
 		this.wikiTiddlers.unobserve(this._tiddlersObserver)
