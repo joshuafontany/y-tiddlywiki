@@ -327,11 +327,13 @@ class TiddlywikiBinding {
 		} catch (error) {
 			return callback(error)
 		}
+		return callback(null)
 	}
 	load (title,callback) {
 		let fields = null;
 		try{
 			fields = this._load(title);
+			this._updateSelection();
 		} catch (error) {
 			return callback(error)
 		}
@@ -342,9 +344,11 @@ class TiddlywikiBinding {
 			this.wikiDoc.transact(() => {
 				this._delete(title);
 			},this);
+			this._updateSelection();
 		} catch (error) {
 			return callback(error)
 		}
+		return callback(null)
 	}
 	destroy () {
 		this.wikiTiddlers.unobserve(this._tiddlersObserver);
