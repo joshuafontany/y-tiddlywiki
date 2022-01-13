@@ -437,6 +437,7 @@ export class TiddlywikiBinding {
 		let fields = null
 		try{
 			fields = this._load(title)
+			this._updateSelection()
 		} catch (error) {
 			return callback(error)
 		}
@@ -447,6 +448,7 @@ export class TiddlywikiBinding {
 			this.wikiDoc.transact(() => {
 				this._delete(title)
 			},this);
+			this._updateSelection()
 		} catch (error) {
 			return callback(error)
 		}
