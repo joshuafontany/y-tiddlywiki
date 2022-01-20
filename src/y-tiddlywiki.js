@@ -19,7 +19,7 @@ A yjs binding connecting a Y.Doc to the current $tw.
 import { createMutex } from 'lib0/mutex.js'
 import * as Y from 'yjs' // eslint-disable-line
 import { Awareness } from 'y-protocols/awareness.js' // eslint-disable-line
-import Delta from 'quill-delta'; // eslint-disable-line
+const Delta = require('./delta-rollup.cjs') // eslint-disable-line
 
 /**
  * Removes the pending '\n's if it has no attributes.
@@ -190,8 +190,7 @@ export class TiddlywikiBinding {
 		if(!wikiDoc) throw new Error("TiddlywikiBinding Error: invalid wikiDoc provided in constructor.");
 		
 		this.logger = null
-
-    this.textFields = [];
+		this.textFields = [];
 
 		const mux = createMutex()
 		this.mux = mux

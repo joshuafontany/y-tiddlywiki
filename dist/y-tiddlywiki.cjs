@@ -5,9 +5,6 @@ Object.defineProperty(exports, '__esModule', { value: true });
 var mutex_js = require('lib0/dist/mutex.cjs');
 var Y = require('yjs');
 require('y-protocols/dist/awareness.cjs');
-var Delta = require('quill-delta');
-
-function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
 
 function _interopNamespace(e) {
 	if (e && e.__esModule) return e;
@@ -28,7 +25,8 @@ function _interopNamespace(e) {
 }
 
 var Y__namespace = /*#__PURE__*/_interopNamespace(Y);
-var Delta__default = /*#__PURE__*/_interopDefaultLegacy(Delta);
+
+const Delta = require('./delta-rollup.cjs'); // eslint-disable-line
 
 /**
  * Removes the pending '\n's if it has no attributes.
@@ -86,8 +84,7 @@ class TiddlywikiBinding {
 		if(!wikiDoc) throw new Error("TiddlywikiBinding Error: invalid wikiDoc provided in constructor.");
 		
 		this.logger = null;
-
-    this.textFields = [];
+		this.textFields = [];
 
 		const mux = mutex_js.createMutex();
 		this.mux = mux;
@@ -229,8 +226,8 @@ class TiddlywikiBinding {
 							if (!tiddlerMap.has(name)) {
 								tiddlerMap.set(name,yText);
 							}
-							let oldDelta = new Delta__default["default"]().insert(yText.toString()),
-							newDelta = new Delta__default["default"]().insert(field),
+							let oldDelta = new Delta().insert(yText.toString()),
+							newDelta = new Delta().insert(field),
 							diff = oldDelta.diff(newDelta);
 							if(diff.ops.length > 0) {
 								yText.applyDelta(diff.ops);

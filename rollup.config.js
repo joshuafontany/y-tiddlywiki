@@ -49,7 +49,24 @@ const debugResolve = {
   }
 }
 
-export default [{
+export default [
+{
+  input: 'quill-delta',
+  output: [{
+    file: 'src/delta-rollup.cjs',
+    format: 'cjs',
+    exports: "default",
+    sourcemap: 'inline'
+  },
+  {
+    file: 'dist/delta-rollup.cjs',
+    format: 'cjs',
+    exports: "default",
+    sourcemap: 'inline'
+  }],
+  plugins: [commonjs(), nodeResolve()]
+},
+{
   input: './src/y-tiddlywiki.js',
   output: [{
     name: 'yTiddlywiki',
