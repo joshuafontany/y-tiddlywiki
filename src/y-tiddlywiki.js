@@ -1,8 +1,8 @@
 
 /*\
-title: y-tiddlywiki.js
+title: $:/plugins/@tw5/y-tiddlywiki/y-tiddlywiki.js
 type: application/javascript
-module-type: library
+module-type: syncadaptor
 
 A yjs binding connecting a Y.Doc to the current $tw.
 
@@ -16,10 +16,11 @@ A yjs binding connecting a Y.Doc to the current $tw.
  * @module bindings/tiddlywiki
  */
 
+//import { $tw } from 'tiddlywiki'
 import { createMutex } from 'lib0/mutex.js'
 import * as Y from 'yjs' // eslint-disable-line
 import { Awareness } from 'y-protocols/awareness.js' // eslint-disable-line
-const Delta = require('./delta-rollup.cjs') // eslint-disable-line
+const Delta = require('./delta-rollup.js') // eslint-disable-line
 
 /**
  * Removes the pending '\n's if it has no attributes.
@@ -66,131 +67,38 @@ const updateCursor = (twCursors, aw, clientId, doc, type) => {
   console.error(err)
   }
 }
-
-class QuillBinding {
-  /**
-   * @param {Y.Text} type
-   * @param {any} quill
-   * @param {Awareness} [awareness]
-   */
-  constructor (type, quill, awareness) {
-    const mux = createMutex()
-    const doc = /** @type {Y.Doc} */ (type.doc)
-    this.mux = mux
-    this.type = type
-    this.doc = doc
-    this.quill = quill
-    const quillCursors = quill.getModule('cursors') || null
-    this.quillCursors = quillCursors
-    // This object contains all attributes used in the quill instance
-    this._negatedUsedFormats = {}
-    this.awareness = awareness
-    this._awarenessChange = ({ added, removed, updated }) => {
-      const states = /** @type {Awareness} */ (awareness).getStates()
-      added.forEach(id => {
-        updateCursor(quillCursors, states.get(id), id, doc, type)
-      })
-      updated.forEach(id => {
-        updateCursor(quillCursors, states.get(id), id, doc, type)
-      })
-      removed.forEach(id => {
-        quillCursors.removeCursor(id.toString())
-      })
-    }
-    this._typeObserver = event => {
-      mux(() => {
-        const eventDelta = event.delta
-        // We always explicitly set attributes, otherwise concurrent edits may
-        // result in quill assuming that a text insertion shall inherit existing
-        // attributes.
-        const delta = []
-        for (let i = 0; i < eventDelta.length; i++) {
-          const d = eventDelta[i]
-          if (d.insert !== undefined) {
-            delta.push(Object.assign({}, d, { attributes: Object.assign({}, this._negatedUsedFormats, d.attributes || {}) }))
-          } else {
-            delta.push(d)
-          }
-        }
-        quill.updateContents(delta, 'yjs')
-      })
-    }
-    type.observe(this._typeObserver)
-    this._quillObserver = (eventType, delta) => {
-      if (delta && delta.ops) {
-        // update content
-        const ops = delta.ops
-        ops.forEach(op => {
-          if (op.attributes !== undefined) {
-            for (let key in op.attributes) {
-              if (this._negatedUsedFormats[key] === undefined) {
-                this._negatedUsedFormats[key] = false
-              }
-            }
-          }
-        })
-        mux(() => {
-          type.applyDelta(ops)
-        })
-      }
-      // always check selection
-      if (awareness && quillCursors) {
-        const sel = quill.getSelection()
-        const aw = /** @type {any} */ (awareness.getLocalState())
-        if (sel === null) {
-          if (awareness.getLocalState() !== null) {
-            awareness.setLocalStateField('cursor', /** @type {any} */ (null))
-          }
-        } else {
-          const anchor = Y.createRelativePositionFromTypeIndex(type, sel.index)
-          const head = Y.createRelativePositionFromTypeIndex(type, sel.index + sel.length)
-          if (!aw || !aw.cursor || !Y.compareRelativePositions(anchor, aw.cursor.anchor) || !Y.compareRelativePositions(head, aw.cursor.head)) {
-            awareness.setLocalStateField('cursor', {
-              anchor,
-              head
-            })
-          }
-        }
-        // update all remote cursor locations
-        awareness.getStates().forEach((aw, clientId) => {
-          updateCursor(quillCursors, aw, clientId, doc, type)
-        })
-      }
-    }
-    quill.on('editor-change', this._quillObserver)
-    mux(() => {
-      // This indirectly initializes _negatedUsedFormats.
-      // Make sure that this call this after the _quillObserver is set.
-      quill.setContents(type.toDelta())
-    })
-    // init remote cursors
-    if (quillCursors !== null && awareness) {
-      awareness.getStates().forEach((aw, clientId) => {
-        updateCursor(quillCursors, aw, clientId, doc, type)
-      })
-      awareness.on('change', this._awarenessChange)
-    }
-  }
-  destroy () {
-    this.type.unobserve(this._typeObserver)
-    this.quill.off('editor-change', this._quillObserver)
-    if (this.awareness) {
-      this.awareness.off('change', this._awarenessChange)
-    }
-  }
-}
-
-export class TiddlywikiBinding {
+class TiddlywikiBinding {
 	/**
-		* @param {Y.Doc} wikiDoc
-		* @param {any} $tw
-		* @param {Awareness} [awareness] optional
-		*/
-	constructor (wikiDoc,$tw,awareness) {
-		if(!wikiDoc) throw new Error("TiddlywikiBinding Error: invalid wikiDoc provided in constructor.");
+	* @param {any} options
+	*/
+	constructor (options) {
+		// @ts-ignore
+		if(!$tw.yjs.doc) throw new Error("TiddlywikiBinding Error: invalid $tw.yjs.doc.");
+
+		if($tw.node){
+			this.boot = options.boot || $tw.boot;
+			// Setup a filesystem adaptor if required???
+			if ($tw.wiki.tiddlerExists("$:/plugins/tiddlywiki/filesystem")) {
+				const FileSystemAdaptor = require("$:/plugins/tiddlywiki/filesystem/filesystemadaptor.js").adaptorClass
+				$tw.yjs.fsadaptor = new FileSystemAdaptor({boot: $tw.boot, wiki: $tw.wiki})
+			}
+		} else {
+			this.hasStatus = false;
+			this.isLoggedIn = false;
+			this.isReadOnly = false;
+			this.isAnonymous = true;
+		}
 		
-		this.logger = null
+		this.wiki = options.wiki || $tw.wiki;
+		this.logger = new $tw.utils.Logger("y-binding",{colour: $tw.node?"blue":"white"});
+		// Find all fields that use $tw.utils.parseStringArray
 		this.textFields = [];
+		$tw.utils.each($tw.Tiddler.fieldModules,(module,name) => {
+			if(module.parse == $tw.utils.parseStringArray) {
+				this.textFields.push(name)
+			}
+		});
+
 
 		const mux = createMutex()
 		this.mux = mux
@@ -375,6 +283,91 @@ export class TiddlywikiBinding {
 		}
 	};
 
+	//syncadaptor proeprties
+	name = "y-tiddlywiki";
+	supportsLazyLoading = false;
+
+	setLoggerSaveBuffer (loggerForSaving) {
+		this.logger.setSaveBuffer(loggerForSaving);
+	}
+	isReady () {
+		return $tw.node? !!$tw.yjs.doc: $tw.yjs.session.synced;
+	}
+	getTiddlerInfo = function(tiddler) {
+		return $tw.yjs.fsadaptor? $tw.yjs.fsadaptor.getTiddlerInfo(tiddler): null;
+	}
+	getStatus (callback) {
+		this.logger.log("Getting status");
+		let username = null;
+		// Get status
+		if(this.isReady()) {
+			this.hasStatus = true;
+			this.logger.log("Status:",JSON.stringify($tw.yjs.session.authStatus,null,$tw.config.preferences.jsonSpaces));
+			// Check if we're logged in
+			username = $tw.yjs.session.authStatus.username;
+			this.isLoggedIn = !!$tw.yjs.session.authStatus.username;
+			this.isReadOnly = !!$tw.yjs.session.authStatus["read_only"];
+			this.isAnonymous = !!$tw.yjs.session.authStatus.anonymous;
+		}
+		// Invoke the callback if present
+		if(callback) {
+			// Invoke the callback if present
+			return callback(null,this.isLoggedIn,username,this.isReadOnly,this.isAnonymous);
+		}	
+	}
+	getUpdatedTiddlers = function(syncer,callback) {
+		// Updates are real-time
+		callback(null,{
+			modifications: [],
+			deletions: []
+		});
+	}
+
+	/*
+	Save a tiddler and invoke the callback with (err,adaptorInfo,revision)
+	*/
+	saveTiddler (tiddler,callback,options) {
+		try{
+			this.wikiDoc.transact(() => {
+				this._save(tiddler)
+			},this);
+			this._updateSelection()
+			if(!!$tw.yjs.fsadaptor) {
+				return $tw.yjs.fsadaptor.saveTiddler(tiddler,callback,options)
+			}
+		} catch (error) {
+			return callback(error)
+		}
+		return callback(null)
+	}
+	/*
+	Load a tiddler and invoke the callback with (err,tiddlerFields)
+	*/
+	loadTiddler (title,callback) {
+		let fields = null
+		try{
+			fields = this._load(title)
+			this._updateSelection()
+		} catch (error) {
+			return callback(error)
+		}
+		return callback(null,fields)
+	}
+	/*
+	Delete a tiddler and invoke the callback with (err)
+	*/
+	deleteTiddler (title,callback,options) {
+		try{
+			this.wikiDoc.transact(() => {
+				this._delete(title)
+			},this);
+			this._updateSelection()
+		} catch (error) {
+			return callback(error)
+		}
+		return callback(null)
+	}
+	
 	setAwareness (awareness) {
 		this.awareness && this.awareness.destroy()
 		this._setAwareness(awareness)
@@ -421,42 +414,19 @@ export class TiddlywikiBinding {
 			})
 		},this)
 	}
-	save (tiddler,callback,options) {
-		try{
-			this.wikiDoc.transact(() => {
-				this._save(tiddler)
-			},this);
-			this._updateSelection()
-		} catch (error) {
-			return callback(error)
-		}
-		return callback(null)
-	}
-	load (title,callback) {
-		let fields = null
-		try{
-			fields = this._load(title)
-			this._updateSelection()
-		} catch (error) {
-			return callback(error)
-		}
-		return callback(null,fields)
-	}
-	delete (title,callback,options) {
-		try{
-			this.wikiDoc.transact(() => {
-				this._delete(title)
-			},this);
-			this._updateSelection()
-		} catch (error) {
-			return callback(error)
-		}
-		return callback(null)
-	}
+
 	destroy () {
 		this.wikiTiddlers.unobserve(this._tiddlersObserver)
 		if(this.awareness) {
 			this.awareness.off('change', this._awarenessChange)
 		}
 	}
+}
+
+if($tw.yjs.doc){
+	if($tw.node) {
+		TiddlywikiBinding.getStatus = null
+		TiddlywikiBinding.getUpdatedTiddlers = null
+	}
+	exports.adaptorClass = TiddlywikiBinding
 }

@@ -53,15 +53,9 @@ export default [
 {
   input: 'quill-delta',
   output: [{
-    file: 'src/delta-rollup.cjs',
-    format: 'cjs',
-    exports: "default",
-    sourcemap: 'inline'
-  },
-  {
-    file: 'dist/delta-rollup.cjs',
-    format: 'cjs',
-    exports: "default",
+    file: 'src/delta-rollup.js',
+    format: 'umd',
+    name: "quill-delta",
     sourcemap: 'inline'
   }],
   plugins: [commonjs(), nodeResolve()]
@@ -69,10 +63,10 @@ export default [
 {
   input: './src/y-tiddlywiki.js',
   output: [{
-    name: 'yTiddlywiki',
-    file: 'dist/y-tiddlywiki.cjs',
-    format: 'cjs',
-    sourcemap: true,
+    file: 'dist/y-tiddlywiki.js',
+    format: 'umd',
+    name: 'y-tiddlywiki',
+    sourcemap: 'inline',
     paths: path => {
       if (/^lib0\//.test(path)) {
         return `lib0/dist/${path.slice(5, -3)}.cjs`
